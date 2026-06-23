@@ -1,0 +1,18 @@
+{
+  "name": "上限仕入れ額計算機",
+  "short_name": "仕入計算",
+  "description": "想定売値から上限仕入れ額を計算し、電卓と履歴で再計算できる軽量アプリ",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f6f8f7",
+  "theme_color": "#1f6f5b",
+  "icons": [
+    {
+      "src": "./icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

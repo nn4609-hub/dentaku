@@ -1,0 +1,7 @@
+[build]
+  command = "npm run build"
+  publish = "web-dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+  ELECTRON_SKIP_BINARY_DOWNLOAD = "1"

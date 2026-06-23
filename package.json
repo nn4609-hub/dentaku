@@ -1,0 +1,44 @@
+{
+  "name": "dentaku",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "electron-main.cjs",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 5174",
+    "dev:mobile": "vite --host 0.0.0.0 --port 5174",
+    "build": "tsc && vite build && node scripts/build-standalone.mjs",
+    "preview": "vite preview --host 127.0.0.1",
+    "desktop": "npm run build && electron-builder --win portable"
+  },
+  "build": {
+    "appId": "local.dentaku.calculator",
+    "productName": "上限仕入れ額計算機",
+    "files": [
+      "web-dist/**/*",
+      "electron-main.cjs",
+      "preload.cjs",
+      "package.json"
+    ],
+    "directories": {
+      "output": "desktop-dist"
+    },
+    "win": {
+      "target": [
+        "portable"
+      ]
+    },
+    "portable": {
+      "artifactName": "${productName}.exe"
+    }
+  },
+  "dependencies": {
+    "decimal.js": "^10.5.0"
+  },
+  "devDependencies": {
+    "electron": "^42.3.3",
+    "electron-builder": "^26.0.0",
+    "typescript": "^5.8.3",
+    "vite": "^8.0.16"
+  }
+}
