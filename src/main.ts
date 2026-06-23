@@ -145,7 +145,27 @@ app.innerHTML = `
             <small id="calcExpression"></small>
             <strong id="calcDisplay">0</strong>
           </div>
-          <p class="keyboard-hint">テンキーでそのまま計算できます。Enter で確定、Esc でクリア。</p>
+          <div id="calculatorKeypad" class="calculator-keypad" aria-label="電卓キー">
+            <button class="calculator-key calculator-key-clear" type="button" data-calculator-action="clear">AC</button>
+            <button class="calculator-key calculator-key-utility" type="button" data-calculator-action="backspace" aria-label="1文字削除">⌫</button>
+            <button class="calculator-key calculator-key-operator" type="button" data-calculator-action="operator" data-value="/">÷</button>
+            <button class="calculator-key calculator-key-operator" type="button" data-calculator-action="operator" data-value="*">×</button>
+            <button class="calculator-key" type="button" data-calculator-action="digit" data-value="7">7</button>
+            <button class="calculator-key" type="button" data-calculator-action="digit" data-value="8">8</button>
+            <button class="calculator-key" type="button" data-calculator-action="digit" data-value="9">9</button>
+            <button class="calculator-key calculator-key-operator" type="button" data-calculator-action="operator" data-value="-">−</button>
+            <button class="calculator-key" type="button" data-calculator-action="digit" data-value="4">4</button>
+            <button class="calculator-key" type="button" data-calculator-action="digit" data-value="5">5</button>
+            <button class="calculator-key" type="button" data-calculator-action="digit" data-value="6">6</button>
+            <button class="calculator-key calculator-key-operator" type="button" data-calculator-action="operator" data-value="+">+</button>
+            <button class="calculator-key" type="button" data-calculator-action="digit" data-value="1">1</button>
+            <button class="calculator-key" type="button" data-calculator-action="digit" data-value="2">2</button>
+            <button class="calculator-key" type="button" data-calculator-action="digit" data-value="3">3</button>
+            <button class="calculator-key calculator-key-equals" type="button" data-calculator-action="evaluate">=</button>
+            <button class="calculator-key calculator-key-zero" type="button" data-calculator-action="digit" data-value="0">0</button>
+            <button class="calculator-key" type="button" data-calculator-action="decimal">.</button>
+          </div>
+          <p class="keyboard-hint">画面のキーまたはテンキーで計算できます。Enter で確定、Esc でクリア。</p>
         </section>
       </section>
 
@@ -179,6 +199,7 @@ const elements = {
   settingsError: getElement<HTMLElement>("settingsError"),
   calcExpression: getElement<HTMLElement>("calcExpression"),
   calcDisplay: getElement<HTMLElement>("calcDisplay"),
+  calculatorKeypad: getElement<HTMLElement>("calculatorKeypad"),
   copyCalc: getElement<HTMLButtonElement>("copyCalc"),
   historyList: getElement<HTMLElement>("historyList"),
   clearHistory: getElement<HTMLButtonElement>("clearHistory"),
@@ -267,6 +288,20 @@ function bindEvents(): void {
     if (!calculatorState.error) {
       copyValue(calculatorState.displayValue);
     }
+  });
+
+  elements.calculatorKeypad.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLElement)) {
+      return;
+    }
+
+    const button = target.closest<HTMLButtonElement>("[data-calculator-action]");
+    if (!button) {
+      return;
+    }
+
+    applyCalculatorAction(button.dataset.calculatorAction ?? "", button.dataset.value);
   });
 
   window.addEventListener("keydown", handleCalculatorKeydown);
@@ -414,22 +449,22 @@ function handleCalculatorKeydown(event: KeyboardEvent): void {
       return;
     }
     event.preventDefault();
-    calculatorState = inputDigit(calculatorState, event.key);
+    applyCalculatorAction("digit", event.key, false);
   } else if (event.key === "." || event.key === "Decimal") {
     if (target === elements.salePrice) {
       return;
     }
     event.preventDefault();
-    calculatorState = inputDecimalPoint(calculatorState);
+    applyCalculatorAction("decimal", undefined, false);
   } else if (isOperatorKey(event.key)) {
     event.preventDefault();
-    calculatorState = chooseOperator(calculatorState, normalizeOperatorKey(event.key));
+    applyCalculatorAction("operator", normalizeOperatorKey(event.key), false);
     if (target instanceof HTMLElement) {
       target.blur();
     }
   } else if (event.key === "Enter" || event.key === "=") {
     event.preventDefault();
-    evaluateAndStore();
+    applyCalculatorAction("evaluate", undefined, false);
     if (target instanceof HTMLElement) {
       target.blur();
     }
@@ -438,22 +473,55 @@ function handleCalculatorKeydown(event: KeyboardEvent): void {
       return;
     }
     event.preventDefault();
-    calculatorState = backspace(calculatorState);
+    applyCalculatorAction("backspace", undefined, false);
   } else if (event.key === "Escape") {
     event.preventDefault();
     if (target === elements.salePrice || salePriceInput !== "") {
       clearSalePrice();
     } else {
-      calculatorState = clearCalculator();
+      applyCalculatorAction("clear", undefined, false);
     }
   } else if (event.key.toLowerCase() === "c") {
     event.preventDefault();
-    calculatorState = clearCalculator();
+    applyCalculatorAction("clear", undefined, false);
   } else {
     return;
   }
 
   render();
+}
+
+function applyCalculatorAction(action: string, value?: string, shouldRender = true): void {
+  switch (action) {
+    case "digit":
+      if (value) {
+        calculatorState = inputDigit(calculatorState, value);
+      }
+      break;
+    case "decimal":
+      calculatorState = inputDecimalPoint(calculatorState);
+      break;
+    case "operator":
+      if (value && isOperatorKey(value)) {
+        calculatorState = chooseOperator(calculatorState, normalizeOperatorKey(value));
+      }
+      break;
+    case "backspace":
+      calculatorState = backspace(calculatorState);
+      break;
+    case "clear":
+      calculatorState = clearCalculator();
+      break;
+    case "evaluate":
+      evaluateAndStore();
+      break;
+    default:
+      return;
+  }
+
+  if (shouldRender) {
+    render();
+  }
 }
 
 function clearSalePrice(): void {
