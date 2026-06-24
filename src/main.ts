@@ -1,13 +1,9 @@
 import Decimal from "decimal.js";
 import {
-  backspace,
   chooseOperator,
   clearCalculator,
   evaluateCalculator,
   initialCalculatorState,
-  inputDecimalPoint,
-  inputDigit,
-  operatorLabel,
   setCurrentValue,
   type CalculatorState,
   type Operator
@@ -92,8 +88,16 @@ app.innerHTML = `
           </label>
 
           <div class="result-box">
-            <span>上限仕入れ額</span>
-            <strong id="limitValue">-</strong>
+            <span>上限仕入れ額 / 計算</span>
+            <input id="calculatorInput" class="calculator-input" inputmode="decimal" autocomplete="off" placeholder="-" aria-label="上限仕入れ額を使った計算" />
+            <div class="calculator-actions" aria-label="演算">
+              <button type="button" class="calculator-action" data-calculator-operator="+" aria-label="加算">+</button>
+              <button type="button" class="calculator-action" data-calculator-operator="-" aria-label="減算">−</button>
+              <button type="button" class="calculator-action" data-calculator-operator="*" aria-label="乗算">×</button>
+              <button type="button" class="calculator-action" data-calculator-operator="/" aria-label="除算">÷</button>
+              <button type="button" class="calculator-action calculator-action-equals" data-calculator-evaluate aria-label="計算結果を表示">=</button>
+              <button type="button" class="calculator-action" data-calculator-clear aria-label="計算をクリア">C</button>
+            </div>
           </div>
 
           <div class="actions-row">
@@ -135,38 +139,6 @@ app.innerHTML = `
           <p id="settingsError" class="error-text" aria-live="polite"></p>
         </section>
 
-        <section class="panel calculator-panel">
-          <div class="panel-heading">
-            <h2>電卓</h2>
-            <button id="copyCalc" class="subtle-button" type="button">コピー</button>
-          </div>
-
-          <div class="calculator-display" aria-live="polite">
-            <small id="calcExpression"></small>
-            <strong id="calcDisplay">0</strong>
-          </div>
-          <div id="calculatorKeypad" class="calculator-keypad" aria-label="電卓キー">
-            <button class="calculator-key calculator-key-clear" type="button" data-calculator-action="clear">AC</button>
-            <button class="calculator-key calculator-key-utility" type="button" data-calculator-action="backspace" aria-label="1文字削除">⌫</button>
-            <button class="calculator-key calculator-key-operator" type="button" data-calculator-action="operator" data-value="/">÷</button>
-            <button class="calculator-key calculator-key-operator" type="button" data-calculator-action="operator" data-value="*">×</button>
-            <button class="calculator-key" type="button" data-calculator-action="digit" data-value="7">7</button>
-            <button class="calculator-key" type="button" data-calculator-action="digit" data-value="8">8</button>
-            <button class="calculator-key" type="button" data-calculator-action="digit" data-value="9">9</button>
-            <button class="calculator-key calculator-key-operator" type="button" data-calculator-action="operator" data-value="-">−</button>
-            <button class="calculator-key" type="button" data-calculator-action="digit" data-value="4">4</button>
-            <button class="calculator-key" type="button" data-calculator-action="digit" data-value="5">5</button>
-            <button class="calculator-key" type="button" data-calculator-action="digit" data-value="6">6</button>
-            <button class="calculator-key calculator-key-operator" type="button" data-calculator-action="operator" data-value="+">+</button>
-            <button class="calculator-key" type="button" data-calculator-action="digit" data-value="1">1</button>
-            <button class="calculator-key" type="button" data-calculator-action="digit" data-value="2">2</button>
-            <button class="calculator-key" type="button" data-calculator-action="digit" data-value="3">3</button>
-            <button class="calculator-key calculator-key-equals" type="button" data-calculator-action="evaluate">=</button>
-            <button class="calculator-key calculator-key-zero" type="button" data-calculator-action="digit" data-value="0">0</button>
-            <button class="calculator-key" type="button" data-calculator-action="decimal">.</button>
-          </div>
-          <p class="keyboard-hint">画面のキーまたはテンキーで計算できます。Enter で確定、Esc でクリア。</p>
-        </section>
       </section>
 
       <aside class="panel history-panel" aria-label="履歴">
@@ -189,7 +161,7 @@ const elements = {
   coefficientBadge: getElement<HTMLElement>("coefficientBadge"),
   salePrice: getElement<HTMLInputElement>("salePrice"),
   clearSalePrice: getElement<HTMLButtonElement>("clearSalePrice"),
-  limitValue: getElement<HTMLElement>("limitValue"),
+  calculatorInput: getElement<HTMLInputElement>("calculatorInput"),
   limitError: getElement<HTMLElement>("limitError"),
   copyLimit: getElement<HTMLButtonElement>("copyLimit"),
   coefficient: getElement<HTMLInputElement>("coefficient"),
@@ -197,10 +169,6 @@ const elements = {
   roundingMode: getElement<HTMLSelectElement>("roundingMode"),
   resetSettings: getElement<HTMLButtonElement>("resetSettings"),
   settingsError: getElement<HTMLElement>("settingsError"),
-  calcExpression: getElement<HTMLElement>("calcExpression"),
-  calcDisplay: getElement<HTMLElement>("calcDisplay"),
-  calculatorKeypad: getElement<HTMLElement>("calculatorKeypad"),
-  copyCalc: getElement<HTMLButtonElement>("copyCalc"),
   historyList: getElement<HTMLElement>("historyList"),
   clearHistory: getElement<HTMLButtonElement>("clearHistory"),
   toast: getElement<HTMLElement>("toast")
@@ -208,6 +176,8 @@ const elements = {
 
 bindEvents();
 syncSettingsControls();
+salePriceInput = elements.salePrice.value;
+computeLimit(false);
 render();
 registerServiceWorker();
 
@@ -279,32 +249,54 @@ function bindEvents(): void {
   });
 
   elements.copyLimit.addEventListener("click", () => {
-    if (limitResult) {
-      copyValue(limitResult.raw);
-    }
-  });
-
-  elements.copyCalc.addEventListener("click", () => {
     if (!calculatorState.error) {
       copyValue(calculatorState.displayValue);
     }
   });
 
-  elements.calculatorKeypad.addEventListener("click", (event) => {
+  elements.calculatorInput.addEventListener("input", () => {
+    updateCalculatorInput();
+  });
+
+  elements.calculatorInput.addEventListener("focus", () => {
+    elements.calculatorInput.select();
+  });
+
+  elements.calculatorInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" || event.key === "=") {
+      event.preventDefault();
+      evaluateAndStore();
+      elements.calculatorInput.blur();
+      render();
+    }
+  });
+
+  document.querySelector(".calculator-actions")?.addEventListener("click", (event) => {
     const target = event.target;
     if (!(target instanceof HTMLElement)) {
       return;
     }
 
-    const button = target.closest<HTMLButtonElement>("[data-calculator-action]");
+    const button = target.closest<HTMLButtonElement>("[data-calculator-operator], [data-calculator-evaluate], [data-calculator-clear]");
     if (!button) {
       return;
     }
 
-    applyCalculatorAction(button.dataset.calculatorAction ?? "", button.dataset.value);
+    const operator = button.dataset.calculatorOperator;
+    if (operator) {
+      calculatorState = chooseOperator(calculatorState, operator as Operator);
+      render();
+      elements.calculatorInput.focus();
+      elements.calculatorInput.select();
+    } else if (button.hasAttribute("data-calculator-evaluate")) {
+      evaluateAndStore();
+      render();
+    } else {
+      calculatorState = clearCalculator();
+      render();
+      elements.calculatorInput.focus();
+    }
   });
-
-  window.addEventListener("keydown", handleCalculatorKeydown);
 
   elements.clearHistory.addEventListener("click", () => {
     history = [];
@@ -423,105 +415,31 @@ function render(): void {
   elements.alwaysOnTopToggle.setAttribute("aria-pressed", String(isAlwaysOnTop));
   elements.alwaysOnTopToggle.textContent = isAlwaysOnTop ? "最前面中" : "最前面";
   elements.coefficientBadge.textContent = `係数 ${settings.coefficient}`;
-  elements.limitValue.textContent = limitResult?.display ?? "-";
+  if (document.activeElement !== elements.calculatorInput) {
+    elements.calculatorInput.value = calculatorState.error ? "" : formatPlain(calculatorState.displayValue);
+  }
+  elements.calculatorInput.placeholder = limitResult?.display ?? "-";
   elements.copyLimit.disabled = !limitResult;
-
-  const expression = calculatorState.pendingOperator
-    ? `${formatDecimal(calculatorState.storedValue ?? "0")} ${operatorLabel(calculatorState.pendingOperator)}`
-    : "";
-  elements.calcExpression.textContent = calculatorState.error ?? expression;
-  elements.calcDisplay.textContent = calculatorState.error ? "エラー" : formatDecimal(calculatorState.displayValue);
 
   renderHistory();
 }
 
-function handleCalculatorKeydown(event: KeyboardEvent): void {
-  const target = event.target;
-  const isTypingInField =
-    target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement;
-
-  if (isTypingInField && target !== elements.salePrice) {
+function updateCalculatorInput(): void {
+  const value = normalizeNumberInput(elements.calculatorInput.value);
+  if (value === "" || value === ".") {
     return;
   }
 
-  if (/^\d$/.test(event.key)) {
-    if (target === elements.salePrice) {
-      return;
-    }
-    event.preventDefault();
-    applyCalculatorAction("digit", event.key, false);
-  } else if (event.key === "." || event.key === "Decimal") {
-    if (target === elements.salePrice) {
-      return;
-    }
-    event.preventDefault();
-    applyCalculatorAction("decimal", undefined, false);
-  } else if (isOperatorKey(event.key)) {
-    event.preventDefault();
-    applyCalculatorAction("operator", normalizeOperatorKey(event.key), false);
-    if (target instanceof HTMLElement) {
-      target.blur();
-    }
-  } else if (event.key === "Enter" || event.key === "=") {
-    event.preventDefault();
-    applyCalculatorAction("evaluate", undefined, false);
-    if (target instanceof HTMLElement) {
-      target.blur();
-    }
-  } else if (event.key === "Backspace") {
-    if (target === elements.salePrice) {
-      return;
-    }
-    event.preventDefault();
-    applyCalculatorAction("backspace", undefined, false);
-  } else if (event.key === "Escape") {
-    event.preventDefault();
-    if (target === elements.salePrice || salePriceInput !== "") {
-      clearSalePrice();
-    } else {
-      applyCalculatorAction("clear", undefined, false);
-    }
-  } else if (event.key.toLowerCase() === "c") {
-    event.preventDefault();
-    applyCalculatorAction("clear", undefined, false);
-  } else {
+  if (!isValidDecimalInput(value)) {
     return;
   }
 
-  render();
-}
-
-function applyCalculatorAction(action: string, value?: string, shouldRender = true): void {
-  switch (action) {
-    case "digit":
-      if (value) {
-        calculatorState = inputDigit(calculatorState, value);
-      }
-      break;
-    case "decimal":
-      calculatorState = inputDecimalPoint(calculatorState);
-      break;
-    case "operator":
-      if (value && isOperatorKey(value)) {
-        calculatorState = chooseOperator(calculatorState, normalizeOperatorKey(value));
-      }
-      break;
-    case "backspace":
-      calculatorState = backspace(calculatorState);
-      break;
-    case "clear":
-      calculatorState = clearCalculator();
-      break;
-    case "evaluate":
-      evaluateAndStore();
-      break;
-    default:
-      return;
-  }
-
-  if (shouldRender) {
-    render();
-  }
+  calculatorState = {
+    ...calculatorState,
+    displayValue: value,
+    waitingForNextInput: false,
+    error: null
+  };
 }
 
 function clearSalePrice(): void {
@@ -539,14 +457,6 @@ function evaluateAndStore(): void {
   if (evaluated.expression && evaluated.result) {
     addHistory("calculator", `${evaluated.expression} = ${formatDecimal(evaluated.result)}`, evaluated.result);
   }
-}
-
-function isOperatorKey(key: string): boolean {
-  return key === "+" || key === "-" || key === "*" || key === "/" || key === "x" || key === "X";
-}
-
-function normalizeOperatorKey(key: string): Operator {
-  return key === "x" || key === "X" ? "*" : (key as Operator);
 }
 
 function renderHistory(): void {

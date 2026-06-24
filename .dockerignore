@@ -1,0 +1,7 @@
+node_modules
+web-dist
+dist
+desktop-dist
+.git
+.gitignore
+npm-debug.log
